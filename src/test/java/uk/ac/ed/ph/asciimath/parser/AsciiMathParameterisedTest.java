@@ -60,7 +60,9 @@ public class AsciiMathParameterisedTest {
     @Test
     public void runTest() throws Throwable {
         final AsciiMathParser parser = new AsciiMathParser();
-        final Document mathmlResult = parser.parseAsciiMath(asciiMathInput);
+        final String mathmlResultString = parser.parseAsciiMath(asciiMathInput);
+        final InputSource mathmlSource = new InputSource(new StringReader(mathmlResultString));
+        final Document mathmlResult = XmlUtilities.createNSAwareDocumentBuilder().parse(mathmlSource);
 
         final InputSource expectedSource = new InputSource(new StringReader(wrapInMathElement(expectedMathML)));
         final Document expectedDocument = XmlUtilities.createNSAwareDocumentBuilder().parse(expectedSource);

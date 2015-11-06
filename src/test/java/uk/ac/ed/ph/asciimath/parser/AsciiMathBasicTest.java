@@ -19,12 +19,11 @@
  */
 package uk.ac.ed.ph.asciimath.parser;
 
-import static uk.ac.ed.ph.asciimath.parser.AsciiMathTestUtilities.assertXMLEqual;
 import static uk.ac.ed.ph.asciimath.parser.AsciiMathTestUtilities.wrapInMathElement;
 
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.w3c.dom.Document;
 
 /**
  * Basic tests of the parser API
@@ -47,7 +46,15 @@ public class AsciiMathBasicTest {
 
     @Test
     public void testSuccessBasic() throws Throwable {
-        assertXMLEqual(wrapInMathElement("<mn>1</mn>"), parser.parseAsciiMath("1"));
+        Assert.assertEquals(wrapInMathElement("<mn>1</mn>"), parser.parseAsciiMath("1"));
+    }
+
+    @Test
+    public void testSquare() throws Throwable {
+        final AsciiMathParserOptions options = new AsciiMathParserOptions();
+        options.setAddSourceAnnotation(true);
+        final String output = parser.parseAsciiMath("9m^2", options);
+        Assert.assertEquals(wrapInMathElement("<semantics><mrow><mn>9</mn><msup><mi>m</mi><mn>2</mn></msup></mrow><annotation encoding='ASCIIMathInput'>9m^2</annotation></semantics>"), output);
     }
 
     @Test
@@ -55,8 +62,8 @@ public class AsciiMathBasicTest {
         final AsciiMathParserOptions options = new AsciiMathParserOptions();
         options.setDisplayMode(true);
 
-        final Document output = parser.parseAsciiMath("1", options);
-        assertXMLEqual(wrapInMathElement("<mn>1</mn>", true), output);
+        final String output = parser.parseAsciiMath("1", options);
+        Assert.assertEquals(wrapInMathElement("<mn>1</mn>", true), output);
     }
 
     @Test
@@ -64,14 +71,14 @@ public class AsciiMathBasicTest {
         final AsciiMathParserOptions options = new AsciiMathParserOptions();
         options.setAddSourceAnnotation(true);
 
-        final Document output = parser.parseAsciiMath("1", options);
-        assertXMLEqual(wrapInMathElement("<semantics><mn>1</mn><annotation encoding='ASCIIMathInput'>1</annotation></semantics>"),
+        final String output = parser.parseAsciiMath("1", options);
+        Assert.assertEquals(wrapInMathElement("<semantics><mn>1</mn><annotation encoding='ASCIIMathInput'>1</annotation></semantics>"),
                 output);
     }
 
     @Test
     public void testEmptyInput() throws Throwable {
         /* (Note what ASCIIMath generates here!) */
-        assertXMLEqual(wrapInMathElement("<mo/>"), parser.parseAsciiMath(""));
+        Assert.assertEquals(wrapInMathElement("<mo></mo>"), parser.parseAsciiMath(""));
     }
 }

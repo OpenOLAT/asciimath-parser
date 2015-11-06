@@ -23,11 +23,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.Scriptable;
-import org.mozilla.javascript.ScriptableObject;
+import javax.script.Invocable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+
+import org.apache.commons.pool.PoolableObjectFactory;
+import org.apache.commons.pool.impl.GenericObjectPool;
 import org.w3c.dom.Document;
-import org.w3c.dom.Element;
 
 /**
  * Simple Java wrapper round AsciiMathParser.js that runs it using the Rhino JavaScript engine.
@@ -48,41 +50,21 @@ public final class AsciiMathParser {
     public static final String ASCIIMATH_PARSER_JS_NAME = "AsciiMathParser.js";
 
     /** Location of the bundled AsciiMathParser.js within the ClassPath. (It is included in the JAR file) */
-    public static final String ASCIIMATH_PARSER_JS_LOCATION = "uk/ac/ed/ph/asciimath/parser/AsciiMathParser.js";
+    public static final String ASCIIMATH_PARSER_JS_LOCATION = "/uk/ac/ed/ph/asciimath/parser/AsciiMathParser.js";
+    public static final String DOM_JS_LOCATION = "/uk/ac/ed/ph/asciimath/parser/dom.js";
 
     /** Shared scope used by a single instance of this Class */
-    private final ScriptableObject sharedScope;
+    private final GenericObjectPool sharedScope;
 
     public AsciiMathParser() {
         this(ASCIIMATH_PARSER_JS_LOCATION);
     }
 
     public AsciiMathParser(final String classPathLocation) {
-        final InputStream parserJavaScriptStream = getClass().getClassLoader().getResourceAsStream(classPathLocation);
-        if (parserJavaScriptStream==null) {
-            throw new AsciiMathParserException("AsciiMathParser.js was not found in the ClassPath at " + classPathLocation);
-        }
-        try {
-            /* Read in JavaScript from the ClassPath */
-            final Reader parserJSFileReader = new InputStreamReader(parserJavaScriptStream, "UTF-8");
-
-            /* Evaluate the parser script and store away the results */
-            final Context context = Context.enter();
-            this.sharedScope = context.initStandardObjects();
-            context.evaluateReader(sharedScope, parserJSFileReader, "AsciiMathParser.js", 1, null);
-            Context.exit();
-        }
-        catch (final Exception e) {
-            throw new AsciiMathParserException("Error parsing AsciiMathParser.js", e);
-        }
-        finally {
-            try {
-                parserJavaScriptStream.close();
-            }
-            catch (final Exception e) {
-                throw new AsciiMathParserException("Error closing AsciiMathParser.js stream", e);
-            }
-        }
+        sharedScope = new GenericObjectPool(new AsciiMathEngineFactory());
+        sharedScope.setTestOnBorrow(true);
+        sharedScope.setTestOnReturn(true);
+        sharedScope.setMaxActive(10);
     }
 
     /**
@@ -97,8 +79,8 @@ public final class AsciiMathParser {
      * @throws IllegalArgumentException if asciiMathInput is null
      * @throws AsciiMathParserException if an unexpected Exception happened
      */
-    public Document parseAsciiMath(final String asciiMathInput) {
-        return parseAsciiMath(asciiMathInput, null);
+    public String parseAsciiMath(final String asciiMathInput) {
+        return parseAsciiMath(asciiMathInput, new AsciiMathParserOptions());
     }
 
     /**
@@ -115,38 +97,83 @@ public final class AsciiMathParser {
      * @throws IllegalArgumentException if asciiMathInput is null
      * @throws AsciiMathParserException if an unexpected Exception happened
      */
-    public Document parseAsciiMath(final String asciiMathInput, final AsciiMathParserOptions options) {
+    public String parseAsciiMath(final String asciiMathInput, final AsciiMathParserOptions options) {
         if (asciiMathInput==null) {
             throw new IllegalArgumentException("AsciiMathInput must not be null");
         }
-        /* Create DOM Document for the parser to use */
-        final Document document = XmlUtilities.createNSAwareDocumentBuilder().newDocument();
 
         /* Call up the JavaScript parsing code */
-        final Context context = Context.enter();
+        AsciiMathEngine context = null;
         try {
-            final Scriptable newScope = context.newObject(sharedScope);
-
-            final Scriptable parser = context.newObject(newScope, "AsciiMathParser", new Object[] { document });
-            final Scriptable optionsJS = context.newObject(newScope);
-            if (options!=null) {
-                if (options.isDisplayMode()) {
-                    ScriptableObject.putProperty(optionsJS, OPTION_DISPLAY_MODE, Boolean.TRUE);
-                }
-                if (options.isAddSourceAnnotation()) {
-                    ScriptableObject.putProperty(optionsJS, OPTION_ADD_SOURCE_ANNOTATION, Boolean.TRUE);
+            context = (AsciiMathEngine)sharedScope.borrowObject();
+            return context.transform(asciiMathInput, options);
+        } catch (final Exception e) {
+            throw new AsciiMathParserException("Error running AsciiMathParser.js on input", e);
+        } finally {
+            if(context != null) {
+                try {
+                    sharedScope.returnObject(context);
+                } catch (final Exception e) {
+                    throw new AsciiMathParserException("Error running AsciiMathParser.js on input", e);
                 }
             }
-            final Object result = ScriptableObject.callMethod(parser, "parseAsciiMathInput", new Object[] { asciiMathInput, optionsJS });
-            final Element mathElement = (Element) Context.jsToJava(result, Element.class);
-            document.appendChild(mathElement);
-            return document;
         }
-        catch (final Exception e) {
-            throw new AsciiMathParserException("Error running AsciiMathParser.js on input", e);
+    }
+
+    public static class AsciiMathEngine {
+
+        private final ScriptEngine engine;
+
+        public AsciiMathEngine(final ScriptEngine engine) {
+            this.engine = engine;
         }
-        finally {
-            Context.exit();
+
+        public String transform(final String ascii, final AsciiMathParserOptions options) {
+            try {
+                final Boolean addSourceAnnotation = options == null ? Boolean.FALSE : new Boolean(options.isAddSourceAnnotation());
+                final Boolean displayMode = options == null ? Boolean.FALSE : new Boolean(options.isDisplayMode());
+                final Invocable invocable = (Invocable)engine;
+                return (String)invocable.invokeFunction("parseAsciiMath", ascii, addSourceAnnotation, displayMode);
+            }
+            catch (final Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+    }
+
+    public static class AsciiMathEngineFactory implements PoolableObjectFactory {
+
+        @Override
+        public Object makeObject() throws Exception {
+            final ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
+            final InputStream domImplementation = AsciiMathParser.class.getResourceAsStream("dom.js");
+            final Reader inDomReader = new InputStreamReader(domImplementation);
+            engine.eval(inDomReader);
+            final InputStream asciiMathScript = AsciiMathParser.class.getResourceAsStream("AsciiMathParser.js");
+            final Reader inReader = new InputStreamReader(asciiMathScript);
+            engine.eval(inReader);
+            return new AsciiMathEngine(engine);
+        }
+
+        @Override
+        public void destroyObject(final Object obj) throws Exception {
+            //
+        }
+
+        @Override
+        public boolean validateObject(final Object obj) {
+            return true;
+        }
+
+        @Override
+        public void activateObject(final Object obj) throws Exception {
+            //
+        }
+
+        @Override
+        public void passivateObject(final Object obj) throws Exception {
+            //
         }
     }
 
@@ -164,8 +191,8 @@ public final class AsciiMathParser {
         final String asciiMathInput = inputBuilder.toString();
 
         final AsciiMathParser parser = new AsciiMathParser();
-        final Document result = parser.parseAsciiMath(asciiMathInput);
+        final String result = parser.parseAsciiMath(asciiMathInput);
 
-        System.out.println(XmlUtilities.serializeMathmlDocument(result));
+        System.out.println(result);
     }
 }

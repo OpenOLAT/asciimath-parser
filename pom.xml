@@ -24,21 +24,15 @@ along with AsciiMathParser. If not, see <http://www.gnu.org/licenses/lgpl.html>.
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <name>asciimath-parser</name>
-  <groupId>uk.ac.ed.ph.asciimath</groupId>
+  <groupId>org.openolat.asciimath</groupId>
   <artifactId>asciimath-parser</artifactId>
-  <version>1.1-SNAPSHOT</version>
+  <version>1.3-SNAPSHOT</version>
   <packaging>jar</packaging>
   <properties>
-    <rhino.version>1.7R2</rhino.version>
     <junit.version>4.10</junit.version>
     <xmlunit.version>1.3</xmlunit.version>
   </properties>
   <dependencies>
-    <dependency>
-      <groupId>rhino</groupId>
-      <artifactId>js</artifactId>
-      <version>${rhino.version}</version>
-    </dependency>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -50,6 +44,11 @@ along with AsciiMathParser. If not, see <http://www.gnu.org/licenses/lgpl.html>.
       <artifactId>xmlunit</artifactId>
       <version>${xmlunit.version}</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-pool</groupId>
+      <artifactId>commons-pool</artifactId>
+      <version>1.5.7</version>
     </dependency>
   </dependencies>
   <repositories>
@@ -103,14 +102,15 @@ along with AsciiMathParser. If not, see <http://www.gnu.org/licenses/lgpl.html>.
     <developerConnection>scm:git:git@github.com:davemckain/asciimath-parser.git</developerConnection>
   </scm>
   <distributionManagement>
-    <!-- (This is not intended for general use!) -->
     <repository>
-      <id>www2.ph.ed.ac.uk</id>
-      <url>file:///Disk/apps-team/repositories/maven2</url>
+      <id>nexus.openolat</id>
+      <name>OpenOLAT Internal Nexus Release Repository</name>
+      <url>http://nexus.openolat.org/nexus/content/repositories/openolat</url>
     </repository>
     <snapshotRepository>
-      <id>www2.ph.ed.ac.uk</id>
-      <url>file:///Disk/apps-team/repositories/maven2</url>
+      <id>nexus.openolat</id>
+      <name>OpenOLAT Internal Nexus Snapshot Repository</name>
+      <url>http://nexus.openolat.org/nexus/content/repositories/openolat-snapshots</url>
     </snapshotRepository>
   </distributionManagement>
   <build>
@@ -119,8 +119,8 @@ along with AsciiMathParser. If not, see <http://www.gnu.org/licenses/lgpl.html>.
         <artifactId>maven-compiler-plugin</artifactId>
         <version>2.3.2</version>
         <configuration>
-          <source>1.5</source>
-          <target>1.5</target>
+          <source>1.8</source>
+          <target>1.8</target>
           <encoding>UTF-8</encoding>
         </configuration>
       </plugin>
@@ -143,6 +143,18 @@ along with AsciiMathParser. If not, see <http://www.gnu.org/licenses/lgpl.html>.
           </archive>
         </configuration>
       </plugin>
+      <plugin>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+           </execution>
+         </executions>
+       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <version>2.8</version>

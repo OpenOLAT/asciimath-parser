@@ -1,22 +1,15 @@
-/*
+/* $Id: AsciiMathParser.js 2849 2012-04-17 15:36:18Z davemckain $
 
-Copyright (c) 2011-2012, The University of Edinburgh
-All Rights Reserved
+!!! MathAssess Modifications !!!
+================================
 
-This file is part of AsciiMathParser.
+This is a slightly modified version of the version of the script
+that is bundled in AsciiMathParser. The changes made are as follows:
 
-AsciiMathParser is free software; you can redistribute it and/or modify it
-under the terms of the GNU Lesser General Public License as published by the
-Free Software Foundation; either version 3 of the License, or (at your
-option) any later version.
+* The lines defining "f" and "g" have been commented out since we've
+not making any assumptions about "f" and "g" here at all.
 
-AsciiMathParser is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License (at
-http://www.gnu.org/licences/lgpl.html) for more details.
 
-You should have received a copy of the GNU Lesser General Public License
-along with AsciiMathParser. If not, see <http://www.gnu.org/licenses/lgpl.html>.
 
 AsciiMathParser.js
 ==================
@@ -32,9 +25,23 @@ The only requirement is that you can provide a DOM Document Object
 when creating a parser. (Microsoft's implementation of Document is fine
 too.)
 
-*/
+---------------------------------------------------------------
 
-/************************************************************************/
+Copyright (c) 2011, The University of Edinburgh
+
+This programme is free software; you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at
+your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License
+(at http://www.gnu.org/licences/lgpl.html) for more details.
+
+---------------------------------------------------------------
+
+*/
 
 /* This creates a new Object that you can use to parse ASCIIMath input.
  *
@@ -85,7 +92,7 @@ Extensive clean-up and improvements by Paulo Soares, Oct 2007.
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
-the Free Software Foundation; either version 3 of the License, or (at
+the Free Software Foundation; either version 2.1 of the License, or (at
 your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT 
@@ -288,8 +295,8 @@ var AMsymbols = [
 {input:"QQ",  tag:"mo", output:"\u211A", tex:null, ttype:CONST},
 {input:"RR",  tag:"mo", output:"\u211D", tex:null, ttype:CONST},
 {input:"ZZ",  tag:"mo", output:"\u2124", tex:null, ttype:CONST},
-{input:"f",   tag:"mi", output:"f",      tex:null, ttype:UNARY, func:true},
-{input:"g",   tag:"mi", output:"g",      tex:null, ttype:UNARY, func:true},
+//{input:"f",   tag:"mi", output:"f",      tex:null, ttype:UNARY, func:true},
+//{input:"g",   tag:"mi", output:"g",      tex:null, ttype:UNARY, func:true},
 
 //standard functions
 {input:"lim",  tag:"mo", output:"lim", tex:null, ttype:UNDEROVER},
@@ -812,15 +819,14 @@ function AMparseExpr(str,rightbracket) {
 initSymbols();
 
 /* Parses the given ASCIIMathInput, returning a <math> DOM Element */
-this.parseAsciiMathInput = function(asciiMathInput) {
+this.parseASCIIMathInput = function(asciiMathInput) {
   var options = arguments[1] || {};
 
   /* Call up ASCIIMath to do the actual parsing, generating a document fragment */
   var content = AMparseExpr(asciiMathInput.replace(/^\s+/g,""), false)[0];
-
   /* If adding source annotation, then we need to wrap things up appropriately */
   if (options.addSourceAnnotation) {
-    var semantics = createMmlNode("semantics", content.length==1 ? content : createMmlNode("mrow", content));
+    var semantics = createMmlNode("semantics", content.childNodes.length == 1 ? content : createMmlNode("mrow", content));
 
     var annotation = createMmlNode("annotation", document.createTextNode(asciiMathInput));
     annotation.setAttribute("encoding", "ASCIIMathInput");
@@ -831,11 +837,20 @@ this.parseAsciiMathInput = function(asciiMathInput) {
 
   /* Create the containing <math> element */
   var math = createMmlNode("math", content);
+  math.setAttribute("xmlns", "http://www.w3.org/1998/Math/MathML");
   if (options.displayMode) {
     math.setAttribute("display", "block");
   }
-  return math;
+  return math.toString();
 };
 
 // (end of unindented constructor defined at top of file)
+};
+
+parseAsciiMath = function(asciiMathInput, addSourceAnnotation, displayMode) {
+	return new AsciiMathParser(new DOMImplementation().createDocument('', '', null))
+		.parseASCIIMathInput(asciiMathInput, {
+			'addSourceAnnotation': addSourceAnnotation,
+			'displayMode': displayMode
+		});
 };
