@@ -27,8 +27,10 @@ import javax.script.Invocable;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
-import org.apache.commons.pool.PoolableObjectFactory;
-import org.apache.commons.pool.impl.GenericObjectPool;
+import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.PooledObjectFactory;
+import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.w3c.dom.Document;
 
 /**
@@ -54,17 +56,17 @@ public final class AsciiMathParser {
     public static final String DOM_JS_LOCATION = "/uk/ac/ed/ph/asciimath/parser/dom.js";
 
     /** Shared scope used by a single instance of this Class */
-    private final GenericObjectPool sharedScope;
+    private final GenericObjectPool<AsciiMathEngine> sharedScope;
 
     public AsciiMathParser() {
         this(ASCIIMATH_PARSER_JS_LOCATION);
     }
 
     public AsciiMathParser(final String classPathLocation) {
-        sharedScope = new GenericObjectPool(new AsciiMathEngineFactory());
+        sharedScope = new GenericObjectPool<>(new AsciiMathEngineFactory());
         sharedScope.setTestOnBorrow(true);
         sharedScope.setTestOnReturn(true);
-        sharedScope.setMaxActive(10);
+        sharedScope.setMaxTotal(10);
     }
 
     /**
@@ -105,7 +107,7 @@ public final class AsciiMathParser {
         /* Call up the JavaScript parsing code */
         AsciiMathEngine context = null;
         try {
-            context = (AsciiMathEngine)sharedScope.borrowObject();
+            context = sharedScope.borrowObject();
             return context.transform(asciiMathInput, options);
         } catch (final Exception e) {
             throw new AsciiMathParserException("Error running AsciiMathParser.js on input", e);
@@ -142,10 +144,10 @@ public final class AsciiMathParser {
         }
     }
 
-    public static class AsciiMathEngineFactory implements PoolableObjectFactory {
+    public static class AsciiMathEngineFactory implements PooledObjectFactory<AsciiMathEngine> {
 
         @Override
-        public Object makeObject() throws Exception {
+        public PooledObject<AsciiMathEngine> makeObject() throws Exception {
             final ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
             final InputStream domImplementation = AsciiMathParser.class.getResourceAsStream("dom.js");
             final Reader inDomReader = new InputStreamReader(domImplementation);
@@ -153,27 +155,27 @@ public final class AsciiMathParser {
             final InputStream asciiMathScript = AsciiMathParser.class.getResourceAsStream("AsciiMathParser.js");
             final Reader inReader = new InputStreamReader(asciiMathScript);
             engine.eval(inReader);
-            return new AsciiMathEngine(engine);
+            return new DefaultPooledObject<>(new AsciiMathEngine(engine));
         }
 
         @Override
-        public void destroyObject(final Object obj) throws Exception {
+        public void activateObject(final PooledObject<AsciiMathEngine> obj) throws Exception {
             //
         }
 
         @Override
-        public boolean validateObject(final Object obj) {
+        public void destroyObject(final PooledObject<AsciiMathEngine> arg0) throws Exception {
+            //
+        }
+
+        @Override
+        public void passivateObject(final PooledObject<AsciiMathEngine> arg0) throws Exception {
+            //
+        }
+
+        @Override
+        public boolean validateObject(final PooledObject<AsciiMathEngine> arg0) {
             return true;
-        }
-
-        @Override
-        public void activateObject(final Object obj) throws Exception {
-            //
-        }
-
-        @Override
-        public void passivateObject(final Object obj) throws Exception {
-            //
         }
     }
 
