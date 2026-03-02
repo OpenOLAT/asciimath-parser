@@ -1,2 +1,8 @@
 target
+bin
 *.sw?
+.classpath
+.project
+.idea
+.DS_Store
+.settings
